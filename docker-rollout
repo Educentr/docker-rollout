@@ -30,17 +30,6 @@ while [ $# -gt 0 ]; do
   shift
 done
 
-# Check if compose v2 is available
-if docker compose >/dev/null 2>&1; then
-  # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
-  COMPOSE_COMMAND="docker $DOCKER_ARGS compose"
-elif docker-compose >/dev/null 2>&1; then
-  COMPOSE_COMMAND="docker-compose"
-else
-  echo "docker compose or docker-compose is required"
-  exit 1
-fi
-
 usage() {
   cat <<EOF
 
@@ -51,6 +40,7 @@ Rollout new Compose service version.
 Options:
   -h, --help                  Print usage
   -f, --file FILE             Compose configuration files
+  -p, --project-name string   Project name
   -t, --timeout N             Healthcheck timeout (default: $HEALTHCHECK_TIMEOUT seconds)
   -w, --wait N                When no healthcheck is defined, wait for N seconds
                               before stopping old container (default: $NO_HEALTHCHECK_TIMEOUT seconds)
@@ -132,7 +122,7 @@ main() {
 
       exit 1
     fi
-    
+
     if [ "$WAIT_AFTER_HEALTHY_DELAY" != "0" ]; then
       echo "==> Waiting for healthy containers to settle down ($WAIT_AFTER_HEALTHY_DELAY seconds)"
       sleep $WAIT_AFTER_HEALTHY_DELAY
@@ -176,6 +166,10 @@ while [ $# -gt 0 ]; do
     WAIT_AFTER_HEALTHY_DELAY="$2"
     shift 2
     ;;
+  -p | --project_name)
+    PROJECT_NAME="$2"
+    shift 2
+    ;;
   -*)
     echo "Unknown option: $1"
     exit_with_usage
@@ -194,6 +188,20 @@ while [ $# -gt 0 ]; do
     ;;
   esac
 done
+
+# Check if compose v2 is available
+if docker compose >/dev/null 2>&1; then
+  # shellcheck disable=SC2086 # DOCKER_ARGS must be unquoted to allow multiple arguments
+  COMPOSE_COMMAND="docker $DOCKER_ARGS compose"
+  if [ ! -z "$PROJECT_NAME" ]; then
+    COMPOSE_COMMAND="$COMPOSE_COMMAND -p $PROJECT_NAME"
+  fi
+elif docker-compose >/dev/null 2>&1; then
+  COMPOSE_COMMAND="docker-compose"
+else
+  echo "docker compose or docker-compose is required"
+  exit 1
+fi
 
 # Require SERVICE argument
 if [ -z "$SERVICE" ]; then
